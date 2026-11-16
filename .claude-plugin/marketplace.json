@@ -1,0 +1,14 @@
+{
+  "name": "doac-podcast-trailer",
+  "description": "The DOAC Podcast Trailer skill: cut a Diary of a CEO style trailer from any podcast episode.",
+  "owner": {
+    "name": "thiernoyunus"
+  },
+  "plugins": [
+    {
+      "name": "doac-podcast-trailer",
+      "source": "./",
+      "description": "Cut a Diary of a CEO style trailer (60-95 s, DOAC captions, sound effects) from any full podcast episode."
+    }
+  ]
+}

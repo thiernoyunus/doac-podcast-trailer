@@ -1,0 +1,8 @@
+{
+  "name": "doac-podcast-trailer",
+  "version": "1.0.0",
+  "description": "Cut a Diary of a CEO style trailer (60-95 s, DOAC captions, sound effects) from any full podcast episode.",
+  "author": { "name": "thiernoyunus" },
+  "repository": "https://github.com/thiernoyunus/doac-podcast-trailer",
+  "license": "MIT"
+}
