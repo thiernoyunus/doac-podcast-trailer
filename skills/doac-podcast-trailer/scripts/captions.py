@@ -161,8 +161,9 @@ def build_blocks(timeline, words_all):
         mine = blocks[n0:]   # a lone small word ("you", "and") looks lost on its own: it joins the block before (or after)
         for i, bl in enumerate(mine):
             if len(bl["words"]) == 1 and core(bl["words"][0]["w"]).lower() in STOP and len(mine) > 1:
-                other = mine[i - 1] if i else mine[i + 1]
-                if i: other["words"] += bl["words"]; other["e"] = bl["e"]
+                prev = next((o for o in reversed(mine[:i]) if o["words"]), None)   # never an already-emptied block
+                other = prev or mine[i + 1]
+                if prev: other["words"] += bl["words"]; other["e"] = bl["e"]
                 else: other["words"][:0] = bl["words"]; other["s"] = bl["s"]
                 bl["words"] = []
         blocks[n0:] = [bl for bl in mine if bl["words"]]
@@ -588,6 +589,9 @@ def selftest():
     b = dict(id="m", start=20.0, end=24.0, gap=0.3)
     ws = [W_("We", 20.0), W_("said", 20.25), W_("it.", 20.5), W_("And", 21.5)]
     assert [[w["w"] for w in bl["words"]] for bl in build_blocks(place_bites([b])[0], ws)] == [["We", "said", "it.", "And"]]
+    ws = [W_("Go.", 20.0), W_("You.", 21.0), W_("Me.", 22.0)]   # two lone words in a row: no emptied block comes back
+    bl3 = build_blocks(place_bites([b])[0], ws)
+    assert [[w["w"] for w in bl["words"]] for bl in bl3] == [["Go.", "You.", "Me."]] and bl3[0]["s"] < bl3[0]["e"]
     words4 = [dict(w=w, s=i, e=i + .2) for i, w in enumerate(["Say", "yes,", "or", "no."])]
     a, z = split(dict(words=words4, s=0, e=4))
     assert [w["w"] for w in a["words"]] == ["Say", "yes,"] and a["e"] == 2 and z["s"] == 2 and z["e"] == 4

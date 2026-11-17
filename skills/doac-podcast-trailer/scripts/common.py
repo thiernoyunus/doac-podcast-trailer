@@ -51,7 +51,10 @@ def spans(b):
     """[[start, end], ...] in source seconds: tighten.py's "pieces", else "parts", else [[start, end]]."""
     if ("pieces" in b or b.get("cut")) and b.get("_tightened") != tight_key(b):
         sys.exit(f"bite {b.get('id')}: start/end/parts/cut changed since tighten.py ran (or it never ran): run tighten.py plan.json")
-    return b.get("pieces") or b.get("parts") or [[b["start"], b["end"]]]
+    if "pieces" in b:
+        if not b["pieces"]: sys.exit(f"bite {b.get('id')}: tighten.py removed all of it: drop the bite or fix its cut")
+        return b["pieces"]
+    return b.get("parts") or [[b["start"], b["end"]]]
 
 
 def bite_time(P, s, e, lo=None, hi=None):
