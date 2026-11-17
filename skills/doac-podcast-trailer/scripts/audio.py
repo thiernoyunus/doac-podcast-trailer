@@ -6,10 +6,11 @@ Sound effects are not mixed in here: sfx.py fetches them and hyperframes.py puts
 Optional plan keys: "music": path to a licensed track, laid quietly under the dialogue; "music_db": its level (default -24).
 No music key means no music: there is no placeholder bed. The music always drops out before the last bite.
 Bite keys: "fade_in"/"fade_out" (seconds, default 0.025) lengthen a bite's edge fade, e.g. 0.1 when the next speaker
-starts right on top of the last word."""
+starts right on top of the last word.
+A bite made of several pieces (tighten.py) plays them back to back, with 10 ms fades where they meet."""
 import json, os, subprocess, sys
 import numpy as np
-from common import load_plan
+from common import load_plan, spans
 
 SR, FPS = 48000, 30
 args = [a for a in sys.argv[1:] if a != "--sfx"]
@@ -37,12 +38,21 @@ def limit(x, ceiling):
 
 
 parts, marks, t = [], [], 0.0
+JOIN = int(0.01 * SR)   # 10 ms fades where two pieces of one bite meet (on quiet points: no click, no gap)
 for b in plan["bites"]:
-    d = b["end"] - b["start"]
+    P = spans(b)
+    d = sum(z - a for a, z in P)
     n = int(round((t + d) * FPS)) - int(round(t * FPS))   # match the video's frame count exactly
     n = int(round(n / FPS * SR))
-    x = load(plan["source"], b["start"], n / SR + 0.1)[:n]
-    if len(x) < n: x = np.vstack([x, np.zeros((n - len(x), 2), np.float32)])
+    x, off = np.zeros((n, 2), np.float32), 0.0
+    for j, (a, z) in enumerate(P):   # the bite's pieces, back to back as one line
+        i0 = int(round(off * SR)); off += z - a
+        i1 = n if j == len(P) - 1 else min(n, int(round(off * SR)))
+        y = load(plan["source"], a, (i1 - i0) / SR + 0.1)[:i1 - i0]
+        ramp = np.linspace(0, 1, min(JOIN, len(y)), dtype=np.float32)[:, None]
+        if j: y[:len(ramp)] *= ramp
+        if j < len(P) - 1: y[len(y) - len(ramp):] *= ramp[::-1]
+        x[i0:i0 + len(y)] = y
     for key, edge in (("fade_in", 0), ("fade_out", 1)):   # 25 ms by default; longer to soften an overlapping voice
         f = max(1, int(b.get(key, 0.025) * SR))
         ramp = np.linspace(0, 1, f, dtype=np.float32)[:, None]

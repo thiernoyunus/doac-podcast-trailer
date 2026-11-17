@@ -3,15 +3,16 @@ usage: track.py plan.json   (edits the plan in place; needs each bite's "cx": 0-
 Adds "track" [[t, cx], ...] with heavy smoothing and a dead zone, so the crop moves like a person on a tripod."""
 import json, os, subprocess, sys
 import numpy as np, cv2
-from common import load_plan, CACHE
+from common import load_plan, spans, CACHE
 
 path = sys.argv[1]
 raw = json.load(open(path)); plan = load_plan(path)
 bites = raw["bites"] if isinstance(raw, dict) else raw
 det = cv2.FaceDetectorYN.create(os.path.join(CACHE, "yunet.onnx"), "", (640, 360), 0.6)
 for b in bites:
-    d = b["end"] - b["start"]
-    fr = subprocess.run(["ffmpeg", "-loglevel", "error", "-ss", str(b["start"]), "-i", plan["source"], "-t", str(d),
+    P = spans(b)   # ponytail: a stitched bite is tracked as if its first piece ran on; fine while the speaker sits still
+    d = sum(z - a for a, z in P)
+    fr = subprocess.run(["ffmpeg", "-loglevel", "error", "-ss", str(P[0][0]), "-i", plan["source"], "-t", str(d),
                          "-vf", "fps=10,scale=640:360", "-f", "rawvideo", "-pix_fmt", "bgr24", "-"], capture_output=True).stdout
     fr = np.frombuffer(fr, np.uint8).reshape(-1, 360, 640, 3)
     left = b.get("cx", 0.5) < 0.5

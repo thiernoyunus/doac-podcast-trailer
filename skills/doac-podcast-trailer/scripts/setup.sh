@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 # One-time setup: Python deps, ffmpeg, caption fonts, face model, and HyperFrames (Node 22, Chrome, ffprobe).
 # Everything is cached in ~/.cache/doac-trailer, so later runs skip what is already there.
-# Writes ~/.cache/doac-trailer/env.sh: `source` it before running any `hyperframes` command.
+# Writes ~/.cache/doac-trailer/env.sh: `source` it before running any script or `hyperframes` command.
 set -e
 C="${DOAC_CACHE:-$HOME/.cache/doac-trailer}"; mkdir -p "$C/fonts" "$C/bin"
-python3 -m pip install -q faster-whisper opencv-python-headless numpy pillow gdown imageio-ffmpeg
+# Its own Python environment: a system Python (Homebrew, Debian) refuses plain `pip install`.
+[ -x "$C/venv/bin/python3" ] || python3 -m venv "$C/venv"
+export PATH="$C/venv/bin:$PATH"
+echo "export PATH=\"$C/venv/bin:$C/bin:$C/node/bin:\$PATH\"" > "$C/env.sh"   # rewritten below once HyperFrames is ready
+python3 -m pip install -q faster-whisper "av<16" opencv-python-headless numpy pillow gdown imageio-ffmpeg   # av 16+ crashes faster-whisper
 if ! command -v ffmpeg >/dev/null; then
   F=$(python3 -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())")
   ln -sf "$F" /usr/local/bin/ffmpeg 2>/dev/null || ln -sf "$F" "$C/bin/ffmpeg"
@@ -12,7 +16,6 @@ fi
 G=https://raw.githubusercontent.com/google/fonts/main/ofl
 get() { [ -s "$C/fonts/$2" ] || curl -sSfL "$G/$1" -o "$C/fonts/$2"; }
 get "montserrat/Montserrat%5Bwght%5D.ttf" Montserrat.ttf
-get "anton/Anton-Regular.ttf" Anton-Regular.ttf
 get "playfairdisplay/PlayfairDisplay-Italic%5Bwght%5D.ttf" PlayfairDisplay-Italic.ttf
 [ -s "$C/yunet.onnx" ] || curl -sSfL https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx -o "$C/yunet.onnx"
 
@@ -65,7 +68,7 @@ fi
 
 cat > "$C/env.sh" <<EOF
 # made by setup.sh: puts hyperframes, ffprobe and Node 22 on PATH for this shell
-export PATH="$C/bin:$C/node/bin:\$PATH"
+export PATH="$C/venv/bin:$C/bin:$C/node/bin:\$PATH"
 export DOAC_HF_PKG="$HF_PKG"
 EOF
 [ -n "$BROWSER" ] && echo "export HYPERFRAMES_BROWSER_PATH=\"$BROWSER\"" >> "$C/env.sh"
