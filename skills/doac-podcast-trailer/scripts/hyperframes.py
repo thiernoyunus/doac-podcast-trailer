@@ -9,7 +9,7 @@ What it writes:
   compositions/captions.html   every caption as HTML text (a block per phrase with data-start/data-duration,
                           a span per word with data-at), plus the caption style block
   assets/clips/NN-*.mp4   each bite pre-cut from the source (frame-accurate, 30 fps, muted); NN-*-2.mp4... for a
-                          bite's further pieces (tighten.py), a punch-in piece scaled up by CSS on its .shot
+                          bite's further pieces (tighten.py), a punch-in piece cropped in like render.py
   assets/audio_mix.wav    the dialogue track from audio.py (-14 LUFS, plus music if the plan has a track)
   assets/sfx/             each sound effect from sfx.py (HyperFrames' sound library), one clip per boom / riser / whoosh
   assets/fonts/           Montserrat, Playfair Display (from ~/.cache/doac-trailer/fonts)
@@ -49,8 +49,8 @@ def cut_plain(src, start, n, sw, sh, out):
                     "-movflags", "+faststart", out], check=True)
 
 
-def cut_reframed(src, b, start, t0, n, sw, sh, W, H, out):
-    """9:16 speaker crop or a zoom: render.py's per-frame crop maths, baked into the clip (a piece t0 s into the bite)."""
+def cut_reframed(src, b, start, t0, n, sw, sh, W, H, out, punch=1.0):
+    """9:16 speaker crop, a zoom or a punch-in: render.py's per-frame crop maths, baked into the clip (a piece t0 s into the bite)."""
     import numpy as np, cv2
     dec = subprocess.Popen(["ffmpeg", "-loglevel", "error", "-ss", f"{start:.3f}", "-i", src, "-t", f"{n / C.FPS + 0.5:.3f}",
                             "-vf", f"scale={sw}:{sh}", "-f", "rawvideo", "-pix_fmt", "bgr24", "-r", str(C.FPS), "-"], stdout=subprocess.PIPE)
@@ -71,7 +71,7 @@ def cut_reframed(src, b, start, t0, n, sw, sh, W, H, out):
         else:
             cx = [s[1] for s in shots if s[0] <= lt][-1]
         zp = lt / b["dur"]; zp = zp * zp * (3 - 2 * zp)
-        z = z0 + (z1 - z0) * zp
+        z = (z0 + (z1 - z0) * zp) * punch
         ch = sh / z; cw = ch * W / H
         x0 = min(max(cx * sw - cw / 2, 0), sw - cw)
         y0 = min(max(cy * sh - ch / 2, 0), sh - ch)
@@ -321,21 +321,20 @@ def main():
             sub = f"-{j + 1}" if len(P) > 1 else ""
             name, vid = f"{k:02d}-{slug}{sub}.mp4", f"bite-{k:02d}{sub}"
             path = os.path.join(outdir, "assets/clips", name)
-            key = json.dumps([src, a, f1 - f0, wide, b.get("zoom"), b.get("track"), b.get("shots"), b.get("cx"), b.get("cy"), t0])
+            key = json.dumps([src, a, f1 - f0, wide, b.get("zoom"), b.get("track"), b.get("shots"), b.get("cx"), b.get("cy"), t0, b["dur"], zoom])
             if not (os.path.exists(path) and cache.get(name) == key):
                 print(f"cut {name}  src {a:.2f}-{z:.2f}  {f1 - f0} frames", flush=True)
-                if wide and list(b.get("zoom", (1.0, 1.0))) == [1.0, 1.0]:
+                if wide and list(b.get("zoom", (1.0, 1.0))) == [1.0, 1.0] and zoom == 1:
                     cut_plain(src, a, f1 - f0, sw, sh, path)
                 else:
-                    cut_reframed(src, b, a, t0, f1 - f0, sw, sh, W, H, path)
+                    cut_reframed(src, b, a, t0, f1 - f0, sw, sh, W, H, path, zoom)
             keep[name] = key
             fp = b.get("focus_pull", 0) if j == 0 else 0
             pull = f' data-focus-pull="{fp}"' if fp else ""
-            punch = f' style="transform: scale({zoom:g})"' if zoom != 1 else ""   # punch-in: a centred tighter crop
-            comment = html.escape(f"{label}: source {a:.2f}-{z:.2f}".replace("--", "-") + (f", punch-in {zoom:g}x" if punch else ""))
+            comment = html.escape(f"{label}: source {a:.2f}-{z:.2f}".replace("--", "-") + (f", punch-in {zoom:g}x" if zoom != 1 else ""))
             bite_html.append(
                 f'      <!-- {comment} -->\n'
-                f'      <div class="shot"{pull}{punch}><video id="{vid}" class="bite" src="assets/clips/{name}" data-start="{secs(f0)}"'
+                f'      <div class="shot"{pull}><video id="{vid}" class="bite" src="assets/clips/{name}" data-start="{secs(f0)}"'
                 f' data-duration="{float(secs(f1)) - float(secs(f0)):.4f}" data-media-start="0" data-track-index="0" muted playsinline></video></div>')
             t0 += z - a
     for f in os.listdir(os.path.join(outdir, "assets/clips")):   # clips of bites no longer in the plan

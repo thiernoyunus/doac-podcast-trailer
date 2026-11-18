@@ -9,12 +9,14 @@ path = sys.argv[1]
 raw = json.load(open(path)); plan = load_plan(path)
 bites = raw["bites"] if isinstance(raw, dict) else raw
 det = cv2.FaceDetectorYN.create(os.path.join(CACHE, "yunet.onnx"), "", (640, 360), 0.6)
-for b in bites:
-    P = spans(b)   # ponytail: a stitched bite is tracked as if its first piece ran on; fine while the speaker sits still
-    d = sum(z - a for a, z in P)
-    fr = subprocess.run(["ffmpeg", "-loglevel", "error", "-ss", str(P[0][0]), "-i", plan["source"], "-t", str(d),
-                         "-vf", "fps=10,scale=640:360", "-f", "rawvideo", "-pix_fmt", "bgr24", "-"], capture_output=True).stdout
-    fr = np.frombuffer(fr, np.uint8).reshape(-1, 360, 640, 3)
+for b, pb in zip(bites, plan["bites"]):
+    frs, ts, off = [], [], 0.0
+    for a, z in spans(pb):   # each piece that plays, at its time in the bite
+        f = subprocess.run(["ffmpeg", "-loglevel", "error", "-ss", str(a), "-i", plan["source"], "-t", str(z - a),
+                            "-vf", "fps=10,scale=640:360", "-f", "rawvideo", "-pix_fmt", "bgr24", "-"], capture_output=True).stdout
+        f = np.frombuffer(f, np.uint8).reshape(-1, 360, 640, 3)
+        frs.append(f); ts += [off + k / 10 for k in range(len(f))]; off += z - a
+    fr = np.concatenate(frs)
     left = b.get("cx", 0.5) < 0.5
     xs = []
     for f in fr:
@@ -32,6 +34,6 @@ for b in bites:
         c = cam[-1]
         if abs(x - c) > 0.035: c += (x - c - np.sign(x - c) * 0.035) * 0.15
         cam.append(c)
-    b["cx"] = float(np.median(xs)); b["track"] = [[i / 10, round(c, 4)] for i, c in enumerate(cam)]
+    b["cx"] = float(np.median(xs)); b["track"] = [[round(t, 3), round(c, 4)] for t, c in zip(ts, cam)]
     print(b["id"], f"face found {ok.mean():.0%} of the time, cx {b['cx']:.2f}")
 json.dump(raw, open(path, "w"), indent=1)

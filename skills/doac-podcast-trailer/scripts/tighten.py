@@ -186,7 +186,7 @@ if __name__ == "__main__":
         P, notes = tighten(b, ws, rms, best, snap, mp)
         d0 = sum(z - a for a, z in (b.get("parts") or [[b["start"], b["end"]]])); d1 = sum(z - a for a, z in P)
         total0 += d0; total1 += d1
-        b["pieces"], b["_tightened"] = P, tight_key(b)
+        b["pieces"], b["_tightened"] = P, tight_key({**b, "_max_pause": mp})
         print(f"{b.get('id', '?'):>3}: {d0:5.2f}s -> {d1:5.2f}s (-{d0 - d1:.2f}s), {len(P)} piece{'s' * (len(P) > 1)}"
               + ("  (keep_pauses)" if b.get("keep_pauses") else "") + "".join(f"\n       {n}" for n in notes))
     json.dump(raw, open(path, "w"), indent=1)

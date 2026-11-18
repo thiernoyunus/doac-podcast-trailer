@@ -17,6 +17,7 @@ def load_plan(path):
     p.setdefault("aspect", "16:9")
     for i, b in enumerate(p["bites"], 1):
         b.setdefault("id", str(i))
+        b["_max_pause"] = p.get("max_pause", 0.2)   # tighten.py's pieces depend on it too (tight_key)
     return p
 
 
@@ -44,13 +45,13 @@ def grab(src, t, w, h):
 # ---------- a bite's pieces: the source ranges it plays back to back as one line ----------
 def tight_key(b):
     """What tighten.py's pieces were computed from: if any of it changed, the pieces are stale."""
-    return [b.get(k) for k in ("start", "end", "parts", "cut", "keep", "keep_pauses", "lock")]
+    return [b.get(k) for k in ("start", "end", "parts", "cut", "keep", "keep_pauses", "lock", "_max_pause")]
 
 
 def spans(b):
     """[[start, end], ...] in source seconds: tighten.py's "pieces", else "parts", else [[start, end]]."""
     if ("pieces" in b or b.get("cut")) and b.get("_tightened") != tight_key(b):
-        sys.exit(f"bite {b.get('id')}: start/end/parts/cut changed since tighten.py ran (or it never ran): run tighten.py plan.json")
+        sys.exit(f"bite {b.get('id')}: start/end/parts/cut/keep or max_pause changed since tighten.py ran (or it never ran): run tighten.py plan.json")
     if "pieces" in b:
         if not b["pieces"]: sys.exit(f"bite {b.get('id')}: tighten.py removed all of it: drop the bite or fix its cut")
         return b["pieces"]

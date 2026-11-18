@@ -86,12 +86,12 @@ Change the plan, not the scripts.
 | "Stay on the topic" | Drop every bite that fails the on-topic test. |
 | Caption wording | Use `fix`, `drop` or `big`. |
 | Highlights / colours | Use `accent` with a colour per word (`{"not": "red"}`). Host lines yellow: set `host` to the host's speaker label. |
-| Caption in the wrong place | `cap_pos` on that bite: `left`, `right`, `between` or `bottom`. |
+| Caption in the wrong place | `cap_pos` on that bite: `left`, `right`, `between` or `bottom` (16:9 only: 9:16 captions always sit at the bottom). |
 | Framing | Use `aspect` or per-bite `zoom`. |
 | Sound effects | Move `boom` / `whoosh` / `riser` to other bites, or change what's searched for with `sounds`. Re-run from step 6.3. |
 | "Too slow" / pauses | Lower `max_pause` (e.g. 0.15), `cut` lead-ins and asides, stitch long answers down with `parts`. Re-run from step 5 (snap, then tighten). |
 | "A stumble is still in" | Run `check_audio.py`: it flags fillers and repeats with their source times. Add a `cut` over each (`edge.py` for exact times), re-run `tighten.py`, `audio.py`, `check_audio.py`. |
-| "Something important got cut" | Add a `keep` range over it (or `keep_pauses` for a deliberate pause), re-run `tighten.py`. |
+| "Something important got cut" | Add a `keep` range over it (or `keep_pauses` for a deliberate pause), re-run `tighten.py`. `keep` only vetoes the fillers and pauses `tighten.py` removes: for words removed by your own `cut` or left outside `parts`, edit those instead. |
 | "The zoom jumps are distracting" | `punch: false` on that bite, or a smaller `punch_scale`. |
 | Caption over a face | `cap_pos` to the other side or `bottom`, fewer words per block (`gap`, `drop`), or a different bite. |
 

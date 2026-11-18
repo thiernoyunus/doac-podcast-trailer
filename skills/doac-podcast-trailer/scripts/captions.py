@@ -7,7 +7,7 @@
 - style numbers (sizes, colours, timing) used by both renderers
 usage: captions.py plan.json    prints every block with its place (no render);  captions.py --selftest
 """
-import json, os, re, sys, zipfile
+import json, os, re, sys, tempfile, zipfile
 import numpy as np
 from PIL import ImageFont
 from common import spans, bite_time, src_time, punches, probe, grab, FONTS, CACHE
@@ -388,7 +388,8 @@ def faces(plan, blocks, W, H, detect=True):
     SH = min(sh0, 1080); SW = SH * sw0 / sh0             # render.py's decode size
     dw, dh = 960, int(round(960 * sh0 / sw0 / 2)) * 2   # detection size
     path = os.path.join(os.path.dirname(plan["transcript"]), "faces.json")
-    cache = json.load(open(path)) if os.path.exists(path) else {}
+    try: cache = json.load(open(path))
+    except (OSError, ValueError): cache = {}   # none yet, or corrupt: rebuilt
     tpath = os.path.join(os.path.dirname(plan["transcript"]), "thumbs.npz")   # small grey frames, for contrast and clutter
     try: thumbs = dict(np.load(tpath))
     except (OSError, ValueError, EOFError, zipfile.BadZipFile): thumbs = {}   # none yet, or half-written: rebuilt
@@ -428,9 +429,10 @@ def faces(plan, blocks, W, H, detect=True):
                 x1, y1 = min(((u + fw) * SW - cx) * s, W), min(((v + fh) * SH - cy) * s, H)
                 if x1 > x0 and y1 - y0 >= MIN_FACE * H: boxes.append((x0, y0, x1, y1))
         out.append((boxes, many, view))
-    json.dump(cache, open(path, "w"))
-    with open(tpath + ".tmp", "wb") as f: np.savez_compressed(f, **thumbs)
-    os.replace(tpath + ".tmp", tpath)   # whole or not at all, if two scripts run at once
+    for p, save in ((path, lambda f: f.write(json.dumps(cache).encode())), (tpath, lambda f: np.savez_compressed(f, **thumbs))):
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(p))   # own temp file, then swapped in whole: safe if two scripts run at once
+        with os.fdopen(fd, "wb") as f: save(f)
+        os.replace(tmp, p)
     return out
 
 

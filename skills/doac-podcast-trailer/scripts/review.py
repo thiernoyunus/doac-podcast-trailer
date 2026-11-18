@@ -51,7 +51,7 @@ def face_check(vid, plan, blocks, timeline):
     W, H = 960, 540
     det = cv2.FaceDetectorYN.create(os.path.join(CACHE, "yunet.onnx"), "", (W, H), 0.8)   # real faces score ~0.9; hands ~0.5-0.7
     wide = plan.get("aspect", "16:9") != "9:16"
-    flagged, skipped, checked, faint = [], 0, 0, []
+    flagged, skipped, checked, faint, unscored = [], 0, 0, [], []
     for bl in blocks:
         for k, t in enumerate((bl["s"] + (bl["e"] - bl["s"]) * 0.6, bl["e"] - 0.2)):   # most words on screen, before the exit
             t0, b = [(a, b) for a, b in timeline if a <= t][-1]
@@ -71,7 +71,8 @@ def face_check(vid, plan, blocks, timeline):
             cap[max(0, y - 15):y + h + 15, max(0, x - 15):x + w + 15] = diff[max(0, y - 15):y + h + 15, max(0, x - 15):x + w + 15]
             if k == 0:
                 c = legibility(fr, src, cap, C.HOST_RGB if bl["host"] else (255, 255, 255))
-                if c is not None and c < C.READABLE: faint.append((t, bl, c))
+                if c is None: unscored.append((t, bl))
+                elif c < C.READABLE: faint.append((t, bl, c))
             _, faces = det.detect(src)
             for f in faces if faces is not None else []:
                 x, y, w, h = (int(v) for v in f[:4])
@@ -87,7 +88,9 @@ def face_check(vid, plan, blocks, timeline):
     for t, bl, c in faint:
         print(f"  {t:5.1f}s  contrast {c:.1f} (under {C.READABLE:g}): \"{' '.join(w['w'] for w in bl['words'])}\"  <-- hard to read: a `cap_pos`"
               " on a darker side, or raise captions.SHADOW_LOW")
-    if not faint: print("  ok: every block checked is readable")
+    for t, bl in unscored:
+        print(f"  {t:5.1f}s  not checked (its letters couldn't be told from the background): \"{' '.join(w['w'] for w in bl['words'])}\"  <-- look at it yourself")
+    if not faint and not unscored: print("  ok: every block checked is readable")
     if skipped:
         sk = [bl for bl in blocks if not wide or bl["bite"].get("zoom")]
         print(f"  skipped on the rendered frames: {len(sk)} block{'s' * (len(sk) != 1)} (9:16 / zoom). captions.py measured the background"
@@ -139,6 +142,9 @@ def pace(timeline, total, blocks):
     src = os.path.join(base, "audio_mix.wav") if os.path.exists(os.path.join(base, "audio_mix.wav")) else vid
     raw = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", src, "-ac", "1", "-ar", "16000", "-f", "f32le", "-"], capture_output=True).stdout
     x = np.frombuffer(raw, np.float32)[: int(total * 16000)]
+    if len(x) < 0.9 * total * 16000:
+        print(f"\npace: couldn't read the sound from {os.path.basename(src)} ({len(x) / 16000:.1f}s of {total:.1f}s)  <-- pace not checked")
+        return
     env = np.sqrt(np.mean(x[: len(x) // 160 * 160].reshape(-1, 160) ** 2, axis=1))   # 10 ms steps
     quiet, runs, i = env < QUIET, [], 0
     while i < len(quiet):

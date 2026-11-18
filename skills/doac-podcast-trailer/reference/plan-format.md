@@ -37,7 +37,7 @@ Editorial choices live here and nowhere else, so changing the trailer means edit
 | `keep_pauses` | no | `true`: `tighten.py` leaves this bite's pauses alone. For the one deliberate pause before the last line |
 | `keep` | no | `[[start, end], ...]` source ranges `tighten.py` must not remove from (veto a filler or pause it printed) |
 | `punch` | no | `false`: no punch-in on this bite's joins |
-| `pieces` | written by `tighten.py` | The kept source spans, played back to back. Never write it by hand: change `start`/`end`, `parts`, `cut` or `keep` and re-run `tighten.py`. The other scripts stop if it is stale |
+| `pieces` | written by `tighten.py` | The kept source spans, played back to back. Never write it by hand: change `start`/`end`, `parts`, `cut`, `keep` or the plan's `max_pause` and re-run `tighten.py`. The other scripts stop if it is stale |
 | `why` | yes | One line: what this bite does for the viewer. If you can't write it, cut the bite |
 | `cap_start`, `cap_end` | no | Only caption words spoken inside this window (default: the bite). Use to drop a stray word from the other speaker at an edge |
 | `drop` | no | Words to leave out of the captions (e.g. a greeting, a name the transcript mangles) |
@@ -46,9 +46,9 @@ Editorial choices live here and nowhere else, so changing the trailer means edit
 | `introduces` | no | On an intro bite: the `speaker` label of the person it introduces (`"Murad"`). `review.py` checks that everyone who speaks twice has one, and that their name is in it |
 | `fix_times` | no | `{"1085.42": "helped"}` replaces just the one word that starts nearest that source time (within 0.03 s; only that word, even when Whisper's words are closer together). Punctuation works as in `fix`. The value may be several words (`"It became"`); they show as one caption word. No word that close prints a `WARNING` |
 | `auto_big` | no | `false`: blocks in this bite with none of your `big` words get no huge word (instead of an automatic pick) |
-| `lock` | no | `true`: `snap.py` leaves this bite's start/end alone, and `tighten.py` uses `parts`/`cut` edges exactly as written (use after placing a cut by hand). Pauses and fillers are still removed |
+| `lock` | no | `true`: `snap.py` leaves this bite's start/end alone, and `tighten.py` uses `parts`/`cut` edges exactly as written (use after placing a cut by hand). Pauses and fillers are still removed, and a final end that lands inside the last word still moves on to where that word finishes |
 | `big` | no | The hero word of a block, shown huge (heavy caps; a soft word like "love" or "purpose" gets italic serif instead). One per block: a number, the topic word, the emotional word. If missing, the first 4+ letter non-filler word is picked |
-| `cap_pos` | no | Where this bite's captions go: `left` / `right` (beside the head), `between` (gap between two people), `bottom`. Default: picked from the faces in shot |
+| `cap_pos` | no | Where this bite's captions go: `left` / `right` (beside the head), `between` (gap between two people), `bottom`. Default: picked from the faces in shot. Ignored on 9:16 (always the bottom) |
 | `accent` | no | Coloured words, any role: `{"not": "red", "money": "box"}`. Colours: `red`, `yellow`, `green`, `pink`, `gold`, `box` (white word on a red box). A list (`["money"]`) picks each colour by meaning (yellow if none fits). Works on host lines too (see editorial.md, Captions) |
 | `auto_accent` | no | `false`: guest blocks with no `accent` word stay white (otherwise a red, green or pink word by meaning is coloured, if there is one). Host blocks never get an automatic colour |
 | `gap` | no | Pause (seconds) that starts a new caption block (default 0.5). Raise it if a slow speaker's lines get split |
@@ -80,7 +80,7 @@ Where a join removed more than 0.15 s or jumps elsewhere in the episode, the pic
 and a centred punch-in (`punch_scale`), the way DOAC hides a jump cut. A caption block stays where it is across a punch-in unless the bigger face would cover it.
 
 ## Rules the scripts enforce for you
-- Each caption block is placed once, from the faces in the frame as shown (punch-in included): one face → beside the head on the side with more room; two or more → the gap between them if it's wide enough, else a small subtitle at the bottom; no face → a small subtitle. 9:16 always goes at the bottom. `review.py` flags any caption that covers a face.
+- Each caption block is placed once, from the faces in the frame as shown (punch-in included): one face → beside the head on the side with more room; two or more → the gap between them if it's wide enough, else a small subtitle at the bottom; no face → a small subtitle. 9:16 always goes at the bottom. `review.py` flags any caption that covers a face, except on 9:16 and `zoom` bites: it skips those, so check them by eye.
 - `tighten.py` keeps someone talking: no silence inside a bite over `max_pause`, and `review.py` flags any silence over 0.35 s outside a `keep_pauses` bite.
 - Every cut gets 25 ms fades (10 ms where two pieces of one bite meet), the dialogue is normalised to -14 LUFS, and each sound effect is levelled so dialogue plus effects never go above -1 dB.
 - Music (only if you set `music`) drops out just before the last bite, and the video holds on black for 1.2 s after it.

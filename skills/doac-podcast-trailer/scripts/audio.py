@@ -58,7 +58,7 @@ for b in plan["bites"]:
         ramp = np.linspace(0, 1, f, dtype=np.float32)[:, None]
         if edge == 0: x[:f] *= ramp
         else: x[-f:] *= ramp[::-1]
-    parts.append(x); marks.append((t, b)); t += n / SR
+    parts.append(x); marks.append((t, b)); t += d   # exact, like captions.place_bites: the frame rounding never adds up
 parts.append(np.zeros((int(END_HOLD * SR), 2), np.float32))
 dlg = np.vstack(parts)
 N = len(dlg); T = np.arange(N) / SR
