@@ -117,8 +117,9 @@ def legibility(fr, src, cap, rgb):
     """Contrast ratio (WCAG) of the caption's letters against the pixels just around them (1-3 px out at 960 wide, where
     the shadow or halo is), measured on the rendered frame: fr = with captions, src = the same frame without, cap = where
     the caption changed the picture. Letters = changed pixels close to the line colour rgb. None if too few letters show."""
-    glyph = (cap > 0) & (np.abs(fr.astype(int) - np.array(rgb[::-1])).max(2) < 50) & (np.abs(fr.astype(int) - src.astype(int)).max(2) > 60)
-    if glyph.sum() < 150: return None
+    colour = (cap > 0) & (np.abs(fr.astype(int) - np.array(rgb[::-1])).max(2) < 50)
+    glyph = colour & (np.abs(fr.astype(int) - src.astype(int)).max(2) > 60)
+    if glyph.sum() < 150 or glyph.sum() < 0.8 * colour.sum(): return None   # letters lost in a same-colour background: unchecked
     g8 = glyph.astype(np.uint8)
     ring = (cv2.dilate(g8, np.ones((7, 7), np.uint8)) > 0) & ~(cv2.dilate(g8, np.ones((3, 3), np.uint8)) > 0)
     grey = cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY)
@@ -140,9 +141,9 @@ def pace(timeline, total, blocks):
     """Pace from the dialogue: words per second, % of time someone speaks (a silence = 0.1 s+ under the quiet level)."""
     base = os.path.dirname(os.path.abspath(sys.argv[2]))
     src = os.path.join(base, "audio_mix.wav") if os.path.exists(os.path.join(base, "audio_mix.wav")) else vid
-    raw = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", src, "-ac", "1", "-ar", "16000", "-f", "f32le", "-"], capture_output=True).stdout
-    x = np.frombuffer(raw, np.float32)[: int(total * 16000)]
-    if len(x) < 0.9 * total * 16000:
+    r = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", src, "-ac", "1", "-ar", "16000", "-f", "f32le", "-"], capture_output=True)
+    x = np.frombuffer(r.stdout, np.float32)[: int(total * 16000)]
+    if r.returncode or len(x) < 0.9 * total * 16000:
         print(f"\npace: couldn't read the sound from {os.path.basename(src)} ({len(x) / 16000:.1f}s of {total:.1f}s)  <-- pace not checked")
         return
     env = np.sqrt(np.mean(x[: len(x) // 160 * 160].reshape(-1, 160) ** 2, axis=1))   # 10 ms steps

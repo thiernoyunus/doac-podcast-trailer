@@ -93,6 +93,6 @@ Change the plan, not the scripts.
 | "A stumble is still in" | Run `check_audio.py`: it flags fillers and repeats with their source times. Add a `cut` over each (`edge.py` for exact times), re-run `tighten.py`, `audio.py`, `check_audio.py`. |
 | "Something important got cut" | Add a `keep` range over it (or `keep_pauses` for a deliberate pause), re-run `tighten.py`. `keep` only vetoes the fillers and pauses `tighten.py` removes: for words removed by your own `cut` or left outside `parts`, edit those instead. |
 | "The zoom jumps are distracting" | `punch: false` on that bite, or a smaller `punch_scale`. |
-| Caption over a face | `cap_pos` to the other side or `bottom`, fewer words per block (`gap`, `drop`), or a different bite. |
+| Caption over a face | 16:9: `cap_pos` to the other side or `bottom`, fewer words per block (`gap`, `drop`), or a different bite. 9:16 (captions always at the bottom): a different bite or a reframe (`cx`/`track`). |
 
 Re-run from step 5 (snap, then tighten).
