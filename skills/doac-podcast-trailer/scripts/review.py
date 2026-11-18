@@ -61,16 +61,19 @@ def face_check(vid, plan, blocks, timeline):
             fr, src = grab(vid, t, W, H), grab(plan["source"], st, W, H)
             if fr is None or src is None: continue
             z = punches(b, plan)[j]
-            if z != 1:   # a punch-in piece: compare with the same centred crop
+            if z != 1:   # a punch-in piece: compare with render.py's crop (around cx, cy)
+                cx = [s[1] for s in (b.get("shots") or [[0, b.get("cx", 0.5)]]) if s[0] <= t - t0][-1]
                 h, w = int(round(H / z)), int(round(W / z))
-                src = cv2.resize(src[(H - h) // 2:(H - h) // 2 + h, (W - w) // 2:(W - w) // 2 + w], (W, H), interpolation=cv2.INTER_CUBIC)
+                x0 = int(min(max(cx * W - w / 2, 0), W - w)); y0 = int(min(max(b.get("cy", 0.5) * H - h / 2, 0), H - h))
+                src = cv2.resize(src[y0:y0 + h, x0:x0 + w], (W, H), interpolation=cv2.INTER_CUBIC)
             checked += 1
             diff = cv2.dilate((np.abs(fr.astype(int) - src.astype(int)).max(2) > 60).astype(np.uint8), np.ones((5, 5), np.uint8))
             cap = np.zeros_like(diff)   # captions only live where the block was placed; ignore motion elsewhere
             x, y, w, h = (int(v / 2) for v in bl["box"])
             cap[max(0, y - 15):y + h + 15, max(0, x - 15):x + w + 15] = diff[max(0, y - 15):y + h + 15, max(0, x - 15):x + w + 15]
             if k == 0:
-                c = legibility(fr, src, cap, C.HOST_RGB if bl["host"] else (255, 255, 255))
+                area = np.zeros_like(diff); area[max(0, y):y + h, max(0, x):x + w] = 1   # the block's own box, not the diff mask
+                c = legibility(fr, src, cap, area, C.HOST_RGB if bl["host"] else (255, 255, 255))
                 if c is None: unscored.append((t, bl))
                 elif c < C.READABLE: faint.append((t, bl, c))
             _, faces = det.detect(src)
@@ -113,12 +116,12 @@ def face_check(vid, plan, blocks, timeline):
     print(f"  see {out}. Fix: fewer words per block (lower `gap`, `drop` filler), a `cap_pos` that has room, or a different bite")
 
 
-def legibility(fr, src, cap, rgb):
+def legibility(fr, src, cap, area, rgb):
     """Contrast ratio (WCAG) of the caption's letters against the pixels just around them (1-3 px out at 960 wide, where
     the shadow or halo is), measured on the rendered frame: fr = with captions, src = the same frame without, cap = where
     the caption changed the picture. Letters = changed pixels close to the line colour rgb. None if too few letters show."""
-    colour = (cap > 0) & (np.abs(fr.astype(int) - np.array(rgb[::-1])).max(2) < 50)
-    glyph = colour & (np.abs(fr.astype(int) - src.astype(int)).max(2) > 60)
+    colour = (area > 0) & (np.abs(fr.astype(int) - np.array(rgb[::-1])).max(2) < 50)   # coverage: independent of the diff
+    glyph = colour & (cap > 0) & (np.abs(fr.astype(int) - src.astype(int)).max(2) > 60)
     if glyph.sum() < 150 or glyph.sum() < 0.8 * colour.sum(): return None   # letters lost in a same-colour background: unchecked
     g8 = glyph.astype(np.uint8)
     ring = (cv2.dilate(g8, np.ones((7, 7), np.uint8)) > 0) & ~(cv2.dilate(g8, np.ones((3, 3), np.uint8)) > 0)
